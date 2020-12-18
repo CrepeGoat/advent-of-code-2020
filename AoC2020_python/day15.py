@@ -26,3 +26,11 @@ def get_2020th(*starters):
         for (i, value) in enumerate(play_the_game(*starters), 1)
         if i == 2020
     )
+
+
+def get_30mth(*starters):
+    return next(
+        value
+        for (i, value) in enumerate(play_the_game(*starters), 1)
+        if i == 30 * 10**6
+    )
