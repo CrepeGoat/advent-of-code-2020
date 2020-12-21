@@ -1,3 +1,4 @@
+use std::io::{BufRead, BufReader};
 use std::str::FromStr;
 use std::vec::Vec;
 use std::num::ParseIntError;
@@ -58,50 +59,47 @@ impl FromStr for Direction {
 }
 
 
-fn parse_input(input_seq: &str) -> Result<Vec<Direction>, ParseDirectionError> {
-	input_seq.split('\n').map(|s: &str| Direction::from_str(&s)).collect()
+fn parsing_input<R: BufRead>(reader: R) -> impl Iterator<Item=Direction> {
+	reader.lines()
+		.filter_map(|r| r.ok())
+		.filter_map(|s| s.parse::<Direction>().ok())
 }
 
 
-fn calc_path_offset(path: Vec<Direction>, init_waypoint: Complex<i64>)
+fn increment_path(instruction: Direction, position: Complex<i64>, waypoint: Complex<i64>)
 -> (Complex<i64>, Complex<i64>)
 {
 	use Direction::{North, South, East, West, Left, Right, Forward};
-	type Coords = Complex<i64>;
 
-	let mut waypoint = init_waypoint;
-	let mut position = Coords::new(0, 0);
-
-	for instruction in path {
-		match instruction {
-			North(dist) => {waypoint += dist as i64 * Coords::new(0, 1);},
-			South(dist) => {waypoint += dist as i64 * Coords::new(0, -1);},
-			East(dist) => {waypoint += dist as i64 * Coords::new(1, 0);},
-			West(dist) => {waypoint += dist as i64 * Coords::new(-1, 0);},
-			Left(rot) => {waypoint *= Coords::new(0, 1).powu((rot as u32) / 90);},
-			Right(rot) => {waypoint *= Coords::new(0, -1).powu((rot as u32) / 90);},
-			Forward(dist) => {position += dist as i64 * waypoint;},
-		}
+	match instruction {
+		North(dist) => (position, waypoint + (dist as i64 * Complex::<i64>::new(0, 1))),
+		South(dist) => (position, waypoint + (dist as i64 * Complex::<i64>::new(0, -1))),
+		East(dist) => (position, waypoint + (dist as i64 * Complex::<i64>::new(1, 0))),
+		West(dist) => (position, waypoint + (dist as i64 * Complex::<i64>::new(-1, 0))),
+		Left(rot) => (position, waypoint * (Complex::<i64>::new(0, 1).powu((rot as u32) / 90))),
+		Right(rot) => (position, waypoint * (Complex::<i64>::new(0, -1).powu((rot as u32) / 90))),
+		Forward(dist) => (position + (dist as i64 * waypoint), waypoint),
 	}
+}
 
-	(position, waypoint)
+
+fn calc_path_result<I>(iter: I, init_waypt: Complex<i64>)
+-> (Complex<i64>, Complex<i64>)
+	where I: Iterator<Item=Direction>
+{
+	iter.fold(
+		(Complex::<i64>::new(0, 0), init_waypt),
+		|pos_waypt, dir| increment_path(dir, pos_waypt.0, pos_waypt.1),
+	)
 }
 
 fn main() {
-	let mut io_buffer = String::new();
-	let mut path = Vec::<Direction>::new();
-	
-	println!("Enter directions:");
-	while
-		std::io::stdin().read_line(&mut io_buffer).is_ok()
-		&& {io_buffer = io_buffer.trim().to_string(); !io_buffer.is_empty()}
-	{
-		println!("{:?}", io_buffer);
-		path.push(Direction::from_str(&io_buffer.as_str()).unwrap());
-		io_buffer.clear();
-	}
+	let stdin = std::io::stdin();
+	let iter_parsed_inputs = parsing_input(stdin.lock());
 
-	let (position, _waypoint) = calc_path_offset(path, Complex::<i64>::new(10, 1));
+	let (position, _waypoint) = calc_path_result(
+		iter_parsed_inputs, Complex::<i64>::new(10, 1)
+	);
 	println!("coords: {:?}", (position.re, position.im));
 	println!("distance: {:?}", position.l1_norm());
 }
@@ -112,12 +110,12 @@ mod tests {
 	use super::*;
 
 	#[test]
-	fn test_parse_input() {
+	fn test_parsing_input() {
 		use Direction::{North, Right, Forward};
 
 		let eg_text = "F10\nN3\nF7\nR90\nF11";
 		assert_eq!(
-			parse_input(eg_text).unwrap(),
+			parsing_input(BufReader::new(eg_text.as_bytes())).collect::<Vec<_>>(),
 			vec![
 				Forward(10u64),
 				North(3u64),
@@ -129,7 +127,7 @@ mod tests {
 	}
 
 	#[test]
-	fn test_calc_path_offset() {
+	fn test_calc_path_result() {
 		use Direction::{North, Right, Forward};
 
 		let eg_instructions = vec![
@@ -140,7 +138,7 @@ mod tests {
 			Forward(11u64),
 		];
 		assert_eq!(
-			calc_path_offset(eg_instructions, Complex::<i64>::new(10, 1)),
+			calc_path_result(eg_instructions.into_iter(), Complex::<i64>::new(10, 1)),
 			(Complex::<i64>::new(214, -72), Complex::<i64>::new(4, -10)),
 		)
 	}
