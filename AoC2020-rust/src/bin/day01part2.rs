@@ -1,3 +1,4 @@
+use std::convert::TryInto;
 use std::str::FromStr;
 use std::io::BufRead;
 
@@ -48,18 +49,22 @@ fn find_sum_triplet(mut seq: Vec<u32>, value: u32) -> Option<(u32, u32, u32)>
 					.map(|k| (bins.0[i], bins.1[j], bins.2[k+j+1]))
 			)
 	}
+	for i in 0usize..seq_bins.len() {
+		for j in i+1..seq_bins.len() {
+			if let Some(k) = (i + j)
+				.try_into().ok()
+				.and_then(|ipj| value.checked_sub(ipj))
+				.map(|k| (k % bin_count) as usize)
+			{
+				let result = search_bins(
+					value, (seq_bins[i], seq_bins[j], seq_bins[k])
+				);
+				if result.is_some() {return result;}
+			}
+		}
+	}
 
-	(0usize..seq_bins.len())
-		.flat_map(|i|
-			(i+1..seq_bins.len())
-				.map(move |j| (i, j))
-				.take_while(|(i, j)| seq[*i] + seq[*j] < value)
-		)
-		.find_map(|(i, j)| search_bins(value, (
-			seq_bins[i],
-			seq_bins[j],
-			seq_bins[(value-(i as u32)-(j as u32) % bin_count) as usize]
-		)))
+	None
 }
 
 fn main() {
