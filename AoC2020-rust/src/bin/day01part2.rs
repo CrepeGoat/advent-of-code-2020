@@ -11,7 +11,7 @@ fn parsing_input<R: BufRead, T: FromStr>(reader: R) -> impl Iterator<Item=T> {
 
 fn find_sum_triplet(mut seq: Vec<u32>, value: u32) -> Option<(u32, u32, u32)>
 {
-	let bin_count = seq.len() as u32;
+	let bin_count = (seq.len() as f64).sqrt() as u32;
 	let sort_key = {|a: &u32| (*a % bin_count, *a)};
 
 	seq.sort_unstable_by_key(sort_key);
