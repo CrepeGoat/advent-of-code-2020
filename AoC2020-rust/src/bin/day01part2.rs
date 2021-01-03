@@ -42,15 +42,15 @@ fn find_sum_triplet(mut seq: Vec<u32>, value: u32) -> Option<(u32, u32, u32)>
 
 		(0usize..bins.0.len())
 			.flat_map(|i|
-				(i+1..bins.1.len())
+				(0..bins.1.len())
 					.map(move |j| (i, j))
 					.take_while(|(i, j)| bins.0[*i] + bins.1[*j] < value)
 			)
 			.find_map(|(i, j)|
-				bins.2[j+1..]
+				bins.2
 					.binary_search(&(value-bins.0[i]-bins.1[j]))
 					.ok()
-					.map(|k| (bins.0[i], bins.1[j], bins.2[k+j+1]))
+					.map(|k| (bins.0[i], bins.1[j], bins.2[k]))
 			)
 	}
 	for i in 0usize..seq_bins.len() {
