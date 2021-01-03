@@ -11,18 +11,22 @@ fn parsing_input<R: BufRead, T: FromStr>(reader: R) -> impl Iterator<Item=T> {
 
 fn find_sum_triplet(mut seq: Vec<u32>, value: u32) -> Option<(u32, u32, u32)>
 {
-	let bin_count = (seq.len() as f64).sqrt() as u32;
+	let bin_count = seq.len() as u32;
 	let sort_key = {|a: &u32| (*a % bin_count, *a)};
 
 	seq.sort_unstable_by_key(sort_key);
 	let mut seq_bins: Vec<&[u32]> = Vec::new();
 	seq_bins.reserve_exact(bin_count as usize);
-	for n in 0..bin_count {
-		let i = seq[..].binary_search_by_key(&(n as u32, n as u32), sort_key)
-			.map_or_else(|x| x, |x| x);
-		let j = seq[..].binary_search_by_key(&(n as u32 + 1, n as u32 + 1), sort_key)
-			.map_or_else(|x| x, |x| x);
-		seq_bins.push(&seq[i..j])
+	{
+		let mut seq_ref = &seq[..];
+		for n in 1u32..=bin_count {
+			let i = seq_ref.binary_search_by_key(&(n, 0u32), sort_key)
+				.map_or_else(|x| x, |x| x);
+			let (seq_i, seq_suffix) = seq_ref.split_at(i);
+			seq_bins.push(seq_i);
+			seq_ref = seq_suffix;
+		}
+		if !seq_ref.is_empty() {panic!("{:?} unbinned elements", seq_ref.len());}
 	}
 
 	fn search_bins(value: u32, bins: (&[u32], &[u32], &[u32])) -> Option<(u32, u32, u32)>{
