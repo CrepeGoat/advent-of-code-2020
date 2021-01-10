@@ -9,7 +9,7 @@ fn parsing_input<R: BufRead, T: FromStr>(reader: R) -> impl Iterator<Item=T> {
 		.filter_map(|s| s.parse::<T>().ok())
 }
 
-fn find_sum_triplet(mut seq: Vec<u32>, value: u32) -> Option<(u32, u32, u32)>
+fn iter_sum_triplets<'a>(seq: &'a mut Vec<u32>, value: u32) -> impl Iterator<Item=(u32, u32, u32)> + 'a
 {
 	let bin_count = (seq.len() as f64).sqrt() as u32;
 	let sort_key = {|a: &u32| (*a % bin_count, *a)};
@@ -53,30 +53,35 @@ fn find_sum_triplet(mut seq: Vec<u32>, value: u32) -> Option<(u32, u32, u32)>
 					.map(|k| (bins.0[i], bins.1[j], bins.2[k]))
 			)
 	}
-	for i in 0usize..seq_bins.len() {
-		for j in i+1..seq_bins.len() {
-			if let Some(k) = (i + j)
-				.try_into().ok()
-				.and_then(|ipj| value.checked_sub(ipj))
-				.map(|k| (k % bin_count) as usize)
-			{
-				let result = search_bins(
-					value, (seq_bins[i], seq_bins[j], seq_bins[k])
-				);
-				if result.is_some() {return result;}
-			}
-		}
-	}
 
-	None
+	let seq_bins_len = seq_bins.len();
+	(0usize..seq_bins_len)
+	.flat_map(
+		move |i|
+		(i+1..seq_bins_len)
+			.map(move |j| (i, j))
+	)
+	.filter_map(
+		move |(i, j)|
+		(i + j)
+			.try_into().ok()
+			.and_then(|ipj| value.checked_sub(ipj))
+			.map(|k| (i, j, (k % bin_count) as usize))
+	)
+	.filter_map(
+		move |(i, j, k)|
+		search_bins(
+			value, (seq_bins[i], seq_bins[j], seq_bins[k])
+		)
+	)
 }
 
 fn main() {
 	println!("Enter input sequence: ");
 	let stdin = std::io::stdin();
-	let parsed_inputs: Vec<u32> = parsing_input(stdin.lock()).collect();
+	let mut parsed_inputs: Vec<u32> = parsing_input(stdin.lock()).collect();
 
-	let vals = find_sum_triplet(parsed_inputs, 2020).unwrap();
+	let vals = iter_sum_triplets(&mut parsed_inputs, 2020).next().unwrap();
 	println!("triplet summing to 2020: {:?}, {:?}, {:?}", vals.0, vals.1, vals.2);
 	println!("product: {:?}", vals.0 * vals.1 * vals.2);
 }
@@ -88,7 +93,7 @@ mod tests {
 
 	#[test]
 	fn test_find_sum_pair() {
-		let sequence = vec![1721, 979, 366, 299, 675, 1456];
-		assert_eq!(find_sum_triplet(sequence, 2020), Some((366, 675, 979)));
+		let mut sequence = vec![1721, 979, 366, 299, 675, 1456];
+		assert_eq!(iter_sum_triplets(&mut sequence, 2020).next(), Some((366, 675, 979)));
 	}
 }
