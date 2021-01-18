@@ -46,19 +46,31 @@ where T: Copy + Add<Output = T> + Mul<Output = T> + std::str::FromStr
 		return Err(());
 	}
 	// Top-down approach -> consume lowest priority (*) first
-	for i in (1..(s.len() - op_len)).rev().filter(|i| &s[*i..(i+op_len)] == " * ")
+	for (s1, _s2, s3) in (1..(s.len() - op_len)).rev()
+		.map(|i| {
+			let (s1, s23) = s.split_at(i);
+			let (s2, s3) = s23.split_at(op_len);
+			(s1, s2, s3)
+		})
+		.filter(|(_s1, s2, _s3)| s2 == &" * ")
 	{
-		if let Ok(lhs) = parse_expr::<T>(&s[..i]) {
-			if let Ok(rhs) = parse_expr::<T>(&s[i+op_len..]) {
+		if let Ok(lhs) = parse_expr::<T>(s1) {
+			if let Ok(rhs) = parse_expr::<T>(s3) {
 				return Ok(lhs * rhs);
 			}
 		}
 	}
 	// Top-down approach -> consume highest priority last
-	for i in (1..(s.len() - op_len)).rev().filter(|i| &s[*i..(i+op_len)] == " + ")
+	for (s1, _s2, s3) in (1..(s.len() - op_len)).rev()
+		.map(|i| {
+			let (s1, s23) = s.split_at(i);
+			let (s2, s3) = s23.split_at(op_len);
+			(s1, s2, s3)
+		})
+		.filter(|(_s1, s2, _s3)| s2 == &" + ")
 	{
-		if let Ok(lhs) = parse_expr::<T>(&s[..i]) {
-			if let Ok(rhs) = parse_expr::<T>(&s[i+op_len..]) {
+		if let Ok(lhs) = parse_expr::<T>(s1) {
+			if let Ok(rhs) = parse_expr::<T>(s3) {
 				return Ok(lhs + rhs);
 			}
 		}
