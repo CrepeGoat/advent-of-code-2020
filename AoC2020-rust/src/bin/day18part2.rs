@@ -2,32 +2,48 @@ use std::io::BufRead;
 use std::ops::{Add, Mul};
 
 
-fn could_be_expr<T>(s: &str) -> bool {
-	let mut count_parens = 0isize;
+struct BracketRevScan {
+	read_count: usize,
+	bracket_count: isize,
+	latest_invalid: Option<usize>,
+}
 
-	for c in s.chars() {
-		match c {
-			'(' => count_parens += 1,
-			')' => {
-				count_parens -= 1;
-				if count_parens < 0 {
-					return false
-				}
-			},
-			_ => (),
+impl BracketRevScan {
+	fn new() -> Self {
+		Self {
+			read_count: 0,
+			bracket_count: 0,
+			latest_invalid: None,			
 		}
 	}
-	count_parens == 0
+
+	fn read_front(&mut self, c: char) {
+		match c {
+			')' => self.bracket_count += 1,
+			'(' => self.bracket_count -= 1,
+			_ => ()
+		};
+		self.read_count += 1;
+		if self.bracket_count < 0 {
+			self.latest_invalid = Some(self.read_count);
+		}
+	}
+
+	fn read_front_all<I: Iterator<Item=char>>(&mut self, iter: I) {
+		for c in iter {
+			self.read_front(c);
+		}
+	}
+
+	fn drop_back(&mut self) {
+		self.read_count -= 1;
+		self.latest_invalid = self.latest_invalid.and_then(|x| x.checked_sub(1));
+	}
 }
 
 fn parse_expr<T>(s: &str) -> Result<T, ()>
 where T: Copy + Add<Output = T> + Mul<Output = T> + std::str::FromStr
 {
-	// Short-circuit obviously wrong expressions
-	if !could_be_expr::<T>(s) {
-		return Err(());
-	}
-
 	// Expression in parentheses
 	if &s[..1] == "(" && &s[s.len()-1..] == ")" {
 		if let Ok(val) = parse_expr(&s[1..s.len()-1]) {
@@ -45,12 +61,27 @@ where T: Copy + Add<Output = T> + Mul<Output = T> + std::str::FromStr
 	if s.len() < 2 + op_len {
 		return Err(());
 	}
+	let mut scan1: BracketRevScan;
+	let mut scan2: BracketRevScan;
+
 	// Top-down approach -> consume lowest priority (*) first
+	scan1 = BracketRevScan::new();
+	scan2 = BracketRevScan::new();
+	scan1.read_front_all(s[..s.len() - op_len].chars().rev());
+	
 	for (s1, _s2, s3) in (1..(s.len() - op_len)).rev()
 		.map(|i| {
 			let (s1, s23) = s.split_at(i);
 			let (s2, s3) = s23.split_at(op_len);
 			(s1, s2, s3)
+		})
+		.filter(|(_s1, _s2, _s3)| {
+			scan1.drop_back();
+			scan1.latest_invalid.is_none()
+		})
+		.filter(|(_s1, _s2, s3)| {
+			scan2.read_front(s3[0..1].chars().next().unwrap());
+			scan2.latest_invalid.is_none() && scan2.bracket_count == 0
 		})
 		.filter(|(_s1, s2, _s3)| s2 == &" * ")
 	{
@@ -60,12 +91,25 @@ where T: Copy + Add<Output = T> + Mul<Output = T> + std::str::FromStr
 			}
 		}
 	}
+
 	// Top-down approach -> consume highest priority last
+	scan1 = BracketRevScan::new();
+	scan2 = BracketRevScan::new();
+	scan1.read_front_all(s[..s.len() - op_len].chars().rev());
+	
 	for (s1, _s2, s3) in (1..(s.len() - op_len)).rev()
 		.map(|i| {
 			let (s1, s23) = s.split_at(i);
 			let (s2, s3) = s23.split_at(op_len);
 			(s1, s2, s3)
+		})
+		.filter(|(_s1, _s2, _s3)| {
+			scan1.drop_back();
+			scan1.latest_invalid.is_none()
+		})
+		.filter(|(_s1, _s2, s3)| {
+			scan2.read_front(s3[0..1].chars().next().unwrap());
+			scan2.latest_invalid.is_none() && scan2.bracket_count == 0
 		})
 		.filter(|(_s1, s2, _s3)| s2 == &" + ")
 	{
